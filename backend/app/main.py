@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app.schemas import UserCreate, UserResponse
-from app.security import hash_password
+from app.schemas import UserCreate, UserResponse, Token
+from app.security import hash_password, verify_password, create_access_token
+
 
 app = FastAPI()
 
@@ -36,3 +37,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     return new_user
+
+@app.post("/login", response_model=Token)
+def login(login:str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.login == login).first()
+
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
+    access_token = create_access_token(data={"sub": str(user.id)})
+
+    return {"access_token": access_token, "token_type": "bearer"}
